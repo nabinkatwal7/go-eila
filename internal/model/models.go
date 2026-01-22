@@ -59,16 +59,23 @@ type Split struct {
 type Budget struct {
 	ID         int64
 	CategoryID int64
-	Amount     int64 // Minor units (cents)
-	Period     string // "Monthly"
-	// Optional: Currency (assuming Base for now, or per budget)
+	Amount     int64
+	Period     string
 }
 
-// Progress struct for UI
 type BudgetProgress struct {
 	CategoryName string
 	Budgeted     float64
 	Spent        float64
 	Remaining    float64
 	Percent      float64
+}
+
+// Rule defines smart enrichment logic
+type Rule struct {
+	ID             int64
+	Pattern        string // Regex or Simple match
+	TargetCategoryID *int64
+	TargetPayee    string
+	TargetNote     string
 }

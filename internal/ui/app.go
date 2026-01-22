@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
@@ -10,20 +9,15 @@ import (
 )
 
 type App struct {
-	FyneApp fyne.App
-	Window  fyne.Window
-	Repo    *repository.Repository
-
+	Repo             *repository.Repository
 	ContentContainer *fyne.Container
+	FyneApp          fyne.App // Use FyneApp instead of Window for creating new windows if needed, but we also passed Window in main
+	Window           fyne.Window
 }
 
-func NewApp(repo *repository.Repository) *App {
-	a := app.New()
-	w := a.NewWindow("MyTrack")
-	w.Resize(fyne.NewSize(1000, 700))
-
+func NewApp(fyneApp fyne.App, w fyne.Window, repo *repository.Repository) *App {
 	myApp := &App{
-		FyneApp: a,
+		FyneApp: fyneApp,
 		Window:  w,
 		Repo:    repo,
 	}
@@ -86,6 +80,11 @@ func (a *App) createSidebar() fyne.CanvasObject {
 		accountsBtn,
 		budgetsBtn,
 	)
+}
+
+func (a *App) Init() {
+	// Initialize things like Shortcuts
+	a.SetupCommandPalette()
 }
 
 func (a *App) Run() {

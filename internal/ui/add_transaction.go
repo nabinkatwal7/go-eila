@@ -70,16 +70,43 @@ func (a *App) createSimpleForm() fyne.CanvasObject {
 		amountCents := int64(priceFloat * 100)
 		date, _ := time.Parse("2006-01-02", dateEntry.Text)
 
+		// Rule Engine Hook
+		// Enrich description (Payee) and Category
+		desc := categorySelect.Selected
+		if noteEntry.Text != "" {
+			desc = noteEntry.Text // If note is present, maybe use that as payee/desc?
+			// Actually "Description" in transaction is usually Payee.
+			// In Simple Form, we misused Description = Category.
+			// let's assume Note is the Payee/Desc for enrichment if provided.
+		}
+
+		enrichedPayee, enrichedCatID, enrichedNote := a.Repo.EnrichTransaction(desc)
+
+		finalDesc := desc
+		if enrichedPayee != "" && enrichedPayee != desc {
+			finalDesc = enrichedPayee
+		}
+
+		finalNote := noteEntry.Text
+		if enrichedNote != "" {
+			finalNote = enrichedNote
+		}
+
 		t := &model.Transaction{
 			Date:        date,
-			Description: categorySelect.Selected,
-			Note:        noteEntry.Text,
+			Description: finalDesc,
+			Note:        finalNote,
 			Status:      model.TransactionStatusPending,
 		}
 
-		// Mock IDs
+		// Mock IDs defaults
 		accountID := int64(1)
 		categoryID := int64(1)
+
+		// If Rule found a category, use it
+		if enrichedCatID != nil {
+			categoryID = *enrichedCatID
+		}
 
 		var splits []model.Split
 

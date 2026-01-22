@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/nabinkatwal7/go-eila/internal/model"
 )
@@ -325,4 +326,64 @@ func (r *Repository) GetBudgetsWithProgress(month int, year int) ([]model.Budget
 	}
 
 	return progress, nil
+}
+
+// --- Rules & Enrichment ---
+
+func (r *Repository) CreateRule(rule *model.Rule) error {
+	query := `INSERT INTO rules (pattern, target_category_id, target_payee, target_note) VALUES (?, ?, ?, ?)`
+	res, err := r.DB.Exec(query, rule.Pattern, rule.TargetCategoryID, rule.TargetPayee, rule.TargetNote)
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	rule.ID = id
+	return nil
+}
+
+func (r *Repository) EnrichTransaction(description string) (string, *int64, string) {
+	// Returns: (NormalizedPayee, CategoryID, Note)
+	// Naive implementation: fetch all rules and regex match.
+	// For small rule set this is fine.
+
+	rows, err := r.DB.Query("SELECT pattern, target_category_id, target_payee, target_note FROM rules")
+	if err != nil {
+		return description, nil, ""
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pattern string
+		var catID *int64
+		var payee sql.NullString
+		var note sql.NullString
+
+		if err := rows.Scan(&pattern, &catID, &payee, &note); err != nil {
+			continue
+		}
+
+		// Simple substring match for now (strings.Contains)
+		// Ideally use Regex if pattern starts with ^ or similar
+		if contains(description, pattern) {
+			newDesc := description
+			if payee.Valid && payee.String != "" {
+				newDesc = payee.String
+			}
+			newNote := ""
+			if note.Valid && note.String != "" {
+				newNote = note.String
+			}
+			return newDesc, catID, newNote
+		}
+	}
+
+	return description, nil, ""
+}
+
+// Helper
+func contains(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }

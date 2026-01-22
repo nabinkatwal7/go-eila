@@ -85,6 +85,15 @@ func createSchema(db *sql.DB) error {
 		period TEXT DEFAULT 'Monthly',
 		FOREIGN KEY(category_id) REFERENCES categories(id)
 	);
+
+	CREATE TABLE IF NOT EXISTS rules (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		pattern TEXT NOT NULL,
+		target_category_id INTEGER,
+		target_payee TEXT,
+		target_note TEXT,
+		FOREIGN KEY(target_category_id) REFERENCES categories(id)
+	);
 	`
 	// Note: We might need to Drop tables if they exist with old schema,
 	// but for now relying on user starting fresh or manual cleanup since this is a dev phase.
