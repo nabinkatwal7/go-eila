@@ -77,6 +77,14 @@ func createSchema(db *sql.DB) error {
 		FOREIGN KEY(account_id) REFERENCES accounts(id),
 		FOREIGN KEY(category_id) REFERENCES categories(id)
 	);
+
+	CREATE TABLE IF NOT EXISTS budgets (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		category_id INTEGER NOT NULL,
+		amount INTEGER NOT NULL,
+		period TEXT DEFAULT 'Monthly',
+		FOREIGN KEY(category_id) REFERENCES categories(id)
+	);
 	`
 	// Note: We might need to Drop tables if they exist with old schema,
 	// but for now relying on user starting fresh or manual cleanup since this is a dev phase.
@@ -93,9 +101,23 @@ func createSchema(db *sql.DB) error {
 
 func seedDefaults(db *sql.DB) {
 	var count int
-	row := db.QueryRow("SELECT COUNT(*) FROM categories")
+	row := db.QueryRow("SELECT COUNT(*) FROM accounts")
+	if err := row.Scan(&count); err == nil && count == 0 {
+		log.Println("Seeding default accounts...")
+		// 1. Cash (Asset)
+		_, _ = db.Exec("INSERT INTO accounts (id, name, type, currency) VALUES (1, 'Cash', 'Cash', 'USD')")
+		// 2. General Expense (Expense)
+		_, _ = db.Exec("INSERT INTO accounts (id, name, type, currency) VALUES (2, 'General Expenses', 'Expense', 'USD')")
+		// 3. General Income (Income)
+		_, _ = db.Exec("INSERT INTO accounts (id, name, type, currency) VALUES (3, 'General Income', 'Income', 'USD')")
+	}
+
+	// Seed Defaults Categories
+	row = db.QueryRow("SELECT COUNT(*) FROM categories")
 	if err := row.Scan(&count); err == nil && count == 0 {
 		log.Println("Seeding default categories...")
-		// TODO: Seed logic
+		_, _ = db.Exec("INSERT INTO categories (id, name, color) VALUES (1, 'Food', '#FF0000')")
+		_, _ = db.Exec("INSERT INTO categories (id, name, color) VALUES (2, 'Transport', '#0000FF')")
+		_, _ = db.Exec("INSERT INTO categories (id, name, color) VALUES (3, 'Salary', '#00FF00')")
 	}
 }

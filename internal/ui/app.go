@@ -69,6 +69,12 @@ func (a *App) createSidebar() fyne.CanvasObject {
 		a.ContentContainer.Refresh()
 	})
 
+	// Budgets
+	budgetsBtn := widget.NewButton("Budgets", func() {
+		a.ContentContainer.Objects = []fyne.CanvasObject{NewBudgetsView(a.Repo, a)}
+		a.ContentContainer.Refresh()
+	})
+
 	// Layout
 	return container.NewVBox(
 		widget.NewLabelWithStyle("MyTrack", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
@@ -78,6 +84,7 @@ func (a *App) createSidebar() fyne.CanvasObject {
 		dashBtn,
 		transBtn,
 		accountsBtn,
+		budgetsBtn,
 	)
 }
 

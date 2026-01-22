@@ -10,13 +10,10 @@ const (
 	AccountTypeBank      AccountType = "Bank"
 	AccountTypeCard      AccountType = "Card"
 	AccountTypeInvest    AccountType = "Investment"
-	AccountTypeEquity    AccountType = "Equity" // Added in double entry
+	AccountTypeEquity    AccountType = "Equity"
 	AccountTypeLiability AccountType = "Liability"
 	AccountTypeIncome    AccountType = "Income"
 	AccountTypeExpense   AccountType = "Expense"
-
-	// Sub-types can be handled via tags or a separate field if needed,
-	// for now mapping high-level types.
 
 	TransactionStatusPending    TransactionStatus = "Pending"
 	TransactionStatusCleared    TransactionStatus = "Cleared"
@@ -27,10 +24,7 @@ type Account struct {
 	ID       int64
 	Name     string
 	Type     AccountType
-	Currency string // ISO 4217 e.g. "USD", "EUR"
-	// Balance is now calculated dynamically from splits,
-	// but caching it might be useful later.
-	// For strict double-entry, we query sum(splits).
+	Currency string
 }
 
 type Category struct {
@@ -41,47 +35,40 @@ type Category struct {
 	ParentID *int64
 }
 
-// Transaction represents the "Header" of a double-entry event.
 type Transaction struct {
 	ID          int64
 	Date        time.Time
-	Description string // Payee or short desc
-	Note        string // Detailed memo
+	Description string
+	Note        string
 	Status      TransactionStatus
-	Splits      []Split // Loaded on demand usually, but helpful here
+	Splits      []Split
 }
 
-// Split represents one leg of the transaction.
-// Sum of Amount must be 0 for a valid transaction.
 type Split struct {
 	ID            int64
 	TransactionID int64
 	AccountID     int64
-	CategoryID    *int64 // Optional: mainly for Expense/Income accounts
+	CategoryID    *int64
 
-	// Amount in minor units (e.g. cents) to avoid float errors.
-	// Positive = Increase Asset/Expense (Debit)
-	// Negative = Increase Liability/Income (Credit)
-	// PROVISO: This sign convention varies.
-	// Let's use:
-	// Debit is Positive (+), Credit is Negative (-)
-	// Asset (+) -> Debit increases
-	// Liability (-) -> Credit increases
-	// Income (-) -> Credit increases
-	// Expense (+) -> Debit increases
 	Amount int64
 
-	Currency      string  // Currency of this split
-	ExchangeRate  float64 // 1.0 if same as base.
+	Currency      string
+	ExchangeRate  float64
 }
 
-// Helper for UI "Simple Mode"
-type SimpleTransactionInput struct {
-	Date        time.Time
-	Description string
-	Amount      float64 // Input as float, convert to int64
-	Type        string // Expense, Income, Transfer
-	FromAccountID int64
-	ToAccountID   *int64 // For transfers
-	CategoryID    *int64
+type Budget struct {
+	ID         int64
+	CategoryID int64
+	Amount     int64 // Minor units (cents)
+	Period     string // "Monthly"
+	// Optional: Currency (assuming Base for now, or per budget)
+}
+
+// Progress struct for UI
+type BudgetProgress struct {
+	CategoryName string
+	Budgeted     float64
+	Spent        float64
+	Remaining    float64
+	Percent      float64
 }

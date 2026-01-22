@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/nabinkatwal7/go-eila/internal/model"
@@ -232,4 +233,96 @@ func (r *Repository) GetDashboardStats() (*DashboardStats, error) {
 	stats.NetWorth = stats.TotalAssets - stats.TotalLiability
 
 	return stats, nil
+}
+
+// --- Budgets ---
+
+func (r *Repository) CreateBudget(b *model.Budget) error {
+	query := `INSERT INTO budgets (category_id, amount, period) VALUES (?, ?, ?)`
+	res, err := r.DB.Exec(query, b.CategoryID, b.Amount, b.Period)
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	b.ID = id
+	return nil
+}
+
+func (r *Repository) GetBudgetsWithProgress(month int, year int) ([]model.BudgetProgress, error) {
+	// For each budget, calculate spent amount in that category for the given month/year.
+	// We need to join splits -> transactions to filter by date.
+
+	// Get all budgets first
+	rows, err := r.DB.Query("SELECT b.category_id, c.name, b.amount FROM budgets b JOIN categories c ON b.category_id = c.id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var progress []model.BudgetProgress
+
+	type budgetItem struct {
+		CatID int64
+		Name  string
+		Amount int64
+	}
+	var items []budgetItem
+
+	for rows.Next() {
+		var bi budgetItem
+		if err := rows.Scan(&bi.CatID, &bi.Name, &bi.Amount); err != nil {
+			return nil, err
+		}
+		items = append(items, bi)
+	}
+	rows.Close()
+
+	// For each, calculate spent
+	// Start/End of month
+	// Date string filter: start <= date < end
+	// SQLite date format YYYY-MM-DD
+	// Simple string match 'YYYY-MM%' works for month
+	dateFilter := fmt.Sprintf("%04d-%02d%%", year, month) // e.g. 2025-01%
+
+	for _, item := range items {
+		var spentCents sql.NullInt64
+		// Join splits -> transactions
+		// Filter by category_id AND date
+		// Amount is Debit (Positive) for Expenses.
+		query := `
+			SELECT SUM(s.amount)
+			FROM splits s
+			JOIN transactions t ON s.transaction_id = t.id
+			WHERE s.category_id = ?
+			AND t.date LIKE ?
+			AND s.amount > 0 -- Only sum debits (expenses)
+		`
+		err := r.DB.QueryRow(query, item.CatID, dateFilter).Scan(&spentCents)
+		if err != nil { return nil, err }
+
+		spent := 0.0
+		if spentCents.Valid {
+			spent = float64(spentCents.Int64) / 100.0
+		}
+
+		budgeted := float64(item.Amount) / 100.0
+		remaining := budgeted - spent
+		percent := 0.0
+		if budgeted > 0 {
+			percent = spent / budgeted
+		}
+
+		progress = append(progress, model.BudgetProgress{
+			CategoryName: item.Name,
+			Budgeted:     budgeted,
+			Spent:        spent,
+			Remaining:    remaining,
+			Percent:      percent,
+		})
+	}
+
+	return progress, nil
 }
