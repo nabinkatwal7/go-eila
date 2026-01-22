@@ -14,33 +14,37 @@ import (
 func NewDashboard(repo *repository.Repository) fyne.CanvasObject {
 	stats, err := repo.GetDashboardStats()
 	if err != nil {
-		// handle error gracefully, maybe show zero stats
-		stats = &repository.DashboardStats{}
+		stats = &repository.DashboardStats{} // Empty on error
 	}
 
 	// 4 Pillars
-	incomeCard := createInfoCard("Income", fmt.Sprintf("%.2f", stats.TotalIncome), color.RGBA{0, 200, 0, 255})
-	expenseCard := createInfoCard("Expenses", fmt.Sprintf("%.2f", stats.TotalExpense), color.RGBA{200, 0, 0, 255})
-	assetCard := createInfoCard("Assets", fmt.Sprintf("%.2f", stats.TotalAssets), color.RGBA{0, 0, 200, 255})
-	liabilityCard := createInfoCard("Liabilities", fmt.Sprintf("%.2f", stats.TotalLiability), color.RGBA{200, 100, 0, 255})
-
+	incomeCard := createInfoCard("Income", fmt.Sprintf("$%.2f", stats.TotalIncome), color.RGBA{0, 200, 0, 255})
+	expenseCard := createInfoCard("Expenses", fmt.Sprintf("$%.2f", stats.TotalExpense), color.RGBA{200, 0, 0, 255})
+	assetCard := createInfoCard("Assets", fmt.Sprintf("$%.2f", stats.TotalAssets), color.RGBA{0, 0, 200, 255})
 	// Net Worth
-	netWorthLabel := widget.NewLabelWithStyle(fmt.Sprintf("Net Worth: $%.2f", stats.NetWorth), fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	netWorthCard := createInfoCard("Net Worth", fmt.Sprintf("$%.2f", stats.NetWorth), color.RGBA{100, 100, 100, 255})
 
-	// Grid for cards
-	cardsGrid := container.NewGridWithColumns(2,
-		incomeCard, expenseCard,
-		assetCard, liabilityCard,
+	pillars := container.NewGridWithColumns(4, incomeCard, expenseCard, assetCard, netWorthCard)
+
+	// Chart
+	chartStats, _ := repo.GetMonthlyStats(6)
+	chart := NewBarChart(chartStats)
+
+	chartArea := container.NewVBox(
+		widget.NewLabelWithStyle("Income vs Expense (6 Months)", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		container.NewCenter(chart),
 	)
 
-	return container.NewVBox(
-		widget.NewLabelWithStyle("Dashboard", fyne.TextAlignLeading, fyne.TextStyle{Bold: true, Monospace: true}),
+	// Placeholder for header, assuming it will be defined elsewhere or is a global variable
+	// For now, let's define a simple header
+	header := widget.NewLabelWithStyle("Dashboard", fyne.TextAlignLeading, fyne.TextStyle{Bold: true, Monospace: true})
+
+	return container.NewVScroll(container.NewVBox(
+		header,
+		pillars,
 		widget.NewSeparator(),
-		cardsGrid,
-		widget.NewSeparator(),
-		netWorthLabel,
-		widget.NewLabel("Recent Activity (Pending Implementation)"),
-	)
+		chartArea,
+	))
 }
 
 func createInfoCard(title, amount string, c color.Color) fyne.CanvasObject {

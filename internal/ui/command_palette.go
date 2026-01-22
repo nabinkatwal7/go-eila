@@ -26,6 +26,8 @@ func (a *App) SetupCommandPalette() {
 		{"Go to Budgets", "Manage spending limits", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewBudgetsView(a.Repo, a)}; a.ContentContainer.Refresh() }},
 		{"Go to Recurring", "View detected subscriptions", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewRecurringView(a.Repo)}; a.ContentContainer.Refresh() }},
 		{"Go to Alerts", "View spending anomalies", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewAnomaliesView(a.Repo)}; a.ContentContainer.Refresh() }},
+		{"Go to Settings", "Backup and Data options", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewSettingsView(a.Repo, a.Window)}; a.ContentContainer.Refresh() }},
+		{"Go to Forecast", "Project future net worth", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewForecastView(a.Repo)}; a.ContentContainer.Refresh() }},
 	}
 
 	// Register Shortcut

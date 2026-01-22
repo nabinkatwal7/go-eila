@@ -418,7 +418,102 @@ func (r *Repository) DetectAnomalies() ([]model.Anomaly, error) {
 	return anomalies, nil
 }
 
-// --- Rules & Enrichment ---
+func (r *Repository) GetMonthlyStats(months int) ([]model.MonthlyStat, error) {
+	// Aggregate Income vs Expense for last N months.
+	// We need 12 rows (or N), with 0 if no data.
+	// SQLite date grouping: strftime('%Y-%m', date)
+
+	query := `
+		SELECT strftime('%Y-%m', t.date) as month_key,
+			   SUM(CASE WHEN a.type = 'Income' THEN ABS(s.amount) ELSE 0 END) as income,
+			   SUM(CASE WHEN a.type = 'Expense' THEN s.amount ELSE 0 END) as expense
+		FROM transactions t
+		JOIN splits s ON s.transaction_id = t.id
+		JOIN accounts a ON s.account_id = a.id
+		WHERE t.date > date('now', ?)
+		GROUP BY month_key
+		ORDER BY month_key ASC
+	`
+	dateParam := fmt.Sprintf("-%d months", months)
+
+	rows, err := r.DB.Query(query, dateParam)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []model.MonthlyStat
+
+	for rows.Next() {
+		var mKey string
+		var inc, exp sql.NullFloat64
+		if err := rows.Scan(&mKey, &inc, &exp); err != nil {
+			continue
+		}
+
+		// Parse month key to "Jan"
+		t, _ := time.Parse("2006-01", mKey)
+		monthName := t.Format("Jan")
+
+		stats = append(stats, model.MonthlyStat{
+			Month: monthName,
+			Income: inc.Float64 / 100.0,
+			Expense: exp.Float64 / 100.0,
+		})
+	}
+
+	return stats, nil
+}
+
+// --- Forecasting ---
+
+type ProjectionPoint struct {
+	Month string
+	Value float64
+}
+
+func (r *Repository) GetNetWorthProjection(monthsAhead int) ([]ProjectionPoint, float64, error) {
+	// 1. Get Current Net Worth
+	stats, err := r.GetDashboardStats()
+	if err != nil { return nil, 0, err }
+	currentNW := stats.NetWorth
+
+	// 2. Calculate Avg Monthly Savings (Last 3 months)
+	// Query already exists essentially in GetMonthlyStats
+	monthlyData, err := r.GetMonthlyStats(3)
+	if err != nil { return nil, 0, err }
+
+	var totalSavings float64
+	var count float64
+	for _, m := range monthlyData {
+		savings := m.Income - m.Expense
+		totalSavings += savings
+		count++
+	}
+
+	avgSavings := 0.0
+	if count > 0 {
+		avgSavings = totalSavings / count
+	}
+
+	// 3. Project
+	var points []ProjectionPoint
+	// Start from next month
+	now := time.Now()
+	runningNW := currentNW
+
+	for i := 1; i <= monthsAhead; i++ {
+		runningNW += avgSavings
+		futureDate := now.AddDate(0, i, 0)
+		points = append(points, ProjectionPoint{
+			Month: futureDate.Format("Jan 06"),
+			Value: runningNW,
+		})
+	}
+
+	return points, avgSavings, nil
+}
+
 
 func (r *Repository) CreateRule(rule *model.Rule) error {
 	query := `INSERT INTO rules (pattern, target_category_id, target_payee, target_note) VALUES (?, ?, ?, ?)`
