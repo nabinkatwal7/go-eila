@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/nabinkatwal7/go-eila/internal/model"
 )
@@ -324,8 +325,97 @@ func (r *Repository) GetBudgetsWithProgress(month int, year int) ([]model.Budget
 			Percent:      percent,
 		})
 	}
-
 	return progress, nil
+}
+
+// --- Recurring Logic (Simple Heuristic) ---
+
+func (r *Repository) DetectRecurringPatterns() ([]model.Subscription, error) {
+	// 1. Group transactions by Description (Payee)
+	// 2. If count >= 2 and amounts are similar -> Candidate
+
+	// This is analytical, can be heavy.
+	query := `
+		SELECT t.description, COUNT(*) as cnt, AVG(s.amount) as avg_amt, MAX(t.date) as last_date
+		FROM transactions t
+		JOIN splits s ON s.transaction_id = t.id
+		WHERE s.amount > 0 -- Expenses only (debits)
+		AND t.date > date('now', '-3 months') -- Look back 3 months
+		GROUP BY t.description
+		HAVING cnt >= 2
+	`
+	rows, err := r.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []model.Subscription
+
+	for rows.Next() {
+		var desc string
+		var cnt int
+		var avgAmt float64
+		var lastDate time.Time
+
+		if err := rows.Scan(&desc, &cnt, &avgAmt, &lastDate); err != nil {
+			continue
+		}
+
+		// Naive: If found, assume Monthly for now
+		subs = append(subs, model.Subscription{
+			Name:      desc,
+			Amount:    avgAmt / 100.0,
+			Frequency: "Monthly?", // Heuristic needed for real frequency
+			NextDueDate: lastDate.AddDate(0, 1, 0).Format("2006-01-02"), // Assume +1 month
+		})
+	}
+
+	return subs, nil
+}
+
+// --- Anomaly Detection ---
+
+func (r *Repository) DetectAnomalies() ([]model.Anomaly, error) {
+	// 1. Large Transactions (Threshold: > $500 or just > $200 for demo)
+	// In production, this should be (Avg + 2*StdDev) per user.
+	// We'll use a hard threshold of $200.00 (20000 cents) for now.
+
+	query := `
+		SELECT t.date, t.description, s.amount
+		FROM transactions t
+		JOIN splits s ON s.transaction_id = t.id
+		WHERE s.amount > 20000 -- $200
+		AND t.date > date('now', '-1 month') -- Recent only
+		ORDER BY t.date DESC
+	`
+
+	rows, err := r.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var anomalies []model.Anomaly
+
+	for rows.Next() {
+		var date time.Time
+		var desc string
+		var amt int64
+
+		if err := rows.Scan(&date, &desc, &amt); err != nil {
+			continue
+		}
+
+		anomalies = append(anomalies, model.Anomaly{
+			Type:        "Large Transaction",
+			Description: fmt.Sprintf("%s: $%.2f", desc, float64(amt)/100.0),
+			Severity:    model.SeverityMedium,
+			Date:        date.Format("2006-01-02"),
+		})
+	}
+
+	return anomalies, nil
 }
 
 // --- Rules & Enrichment ---

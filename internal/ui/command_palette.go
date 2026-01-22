@@ -24,6 +24,8 @@ func (a *App) SetupCommandPalette() {
 		{"Go to Transactions", "View transaction history", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewTransactionsView(a.Repo)}; a.ContentContainer.Refresh() }},
 		{"Go to Accounts", "Manage accounts", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewAccountsView(a.Repo, a)}; a.ContentContainer.Refresh() }},
 		{"Go to Budgets", "Manage spending limits", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewBudgetsView(a.Repo, a)}; a.ContentContainer.Refresh() }},
+		{"Go to Recurring", "View detected subscriptions", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewRecurringView(a.Repo)}; a.ContentContainer.Refresh() }},
+		{"Go to Alerts", "View spending anomalies", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewAnomaliesView(a.Repo)}; a.ContentContainer.Refresh() }},
 	}
 
 	// Register Shortcut
@@ -83,7 +85,6 @@ func (a *App) showPalette(commands []Command) {
 		var filtered []Command
 		for _, c := range commands {
 			if strings.Contains(strings.ToLower(c.Title), s) || strings.Contains(strings.ToLower(c.Description), s) {
-				filtered = filtered
 				filtered = append(filtered, c)
 			}
 		}
