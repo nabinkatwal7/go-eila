@@ -10,11 +10,8 @@ import (
 )
 
 func NewTransactionsView(repo *repository.Repository) fyne.CanvasObject {
-	// Header
-	header := widget.NewLabelWithStyle("Transactions", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	header := widget.NewLabelWithStyle("Transactions (Double-Entry)", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
-	// Table (List of transactions)
-	// For now, dragging in recent transactions
 	txs, err := repo.GetRecentTransactions(50)
 	if err != nil {
 		return widget.NewLabel("Error loading transactions: " + err.Error())
@@ -27,7 +24,7 @@ func NewTransactionsView(repo *repository.Repository) fyne.CanvasObject {
 		func() fyne.CanvasObject {
 			return container.NewHBox(
 				widget.NewLabel("Date"),
-				widget.NewLabel("Note"),
+				widget.NewLabel("Desc"),
 				widget.NewLabel("Amount"),
 			)
 		},
@@ -35,8 +32,18 @@ func NewTransactionsView(repo *repository.Repository) fyne.CanvasObject {
 			t := txs[i]
 			box := o.(*fyne.Container)
 			box.Objects[0].(*widget.Label).SetText(t.Date.Format("2006-01-02"))
-			box.Objects[1].(*widget.Label).SetText(t.Note)
-			box.Objects[2].(*widget.Label).SetText(fmt.Sprintf("%.2f", t.Amount))
+			box.Objects[1].(*widget.Label).SetText(t.Description)
+
+			// Amount: Sum of positive splits? Or just the first split?
+			// Display the first split that is NOT the main account... tricky.
+			// Just display sum of positive splits for now (Total Debit)
+			var sum int64
+			for _, s := range t.Splits {
+				if s.Amount > 0 {
+					sum += s.Amount
+				}
+			}
+			box.Objects[2].(*widget.Label).SetText(fmt.Sprintf("$%.2f", float64(sum)/100.0))
 		},
 	)
 

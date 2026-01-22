@@ -62,8 +62,10 @@ func (a *App) createSidebar() fyne.CanvasObject {
 		a.ContentContainer.Objects = []fyne.CanvasObject{NewTransactionsView(a.Repo)}
 		a.ContentContainer.Refresh()
 	})
+	// Accounts
 	accountsBtn := widget.NewButton("Accounts", func() {
-		a.ContentContainer.Objects = []fyne.CanvasObject{widget.NewLabel("Accounts View Here")}
+		// Show Accounts View
+		a.ContentContainer.Objects = []fyne.CanvasObject{NewAccountsView(a.Repo, a)}
 		a.ContentContainer.Refresh()
 	})
 
