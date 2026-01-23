@@ -4,6 +4,8 @@
 
 MyTrack is a privacy-focused, double-entry accounting money tracker that helps you manage your finances with professional-grade features. All data is stored locally in SQLite - no cloud, no tracking, complete privacy.
 
+![MyTrack Dashboard](assets/screenshot.png)
+
 ## Overview
 
 MyTrack is designed for users who want granular control over their finances. It combines the rigor of double-entry accounting with a modern, fast, and intuitive user interface.
