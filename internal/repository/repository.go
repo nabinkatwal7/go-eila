@@ -597,3 +597,16 @@ func (r *Repository) EnrichTransaction(description string) (string, *int64, stri
 func contains(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
+
+func (r *Repository) GetAccountByName(name string) (*model.Account, error) {
+	query := `SELECT id, name, type, currency FROM accounts WHERE name = ?`
+	var a model.Account
+	err := r.DB.QueryRow(query, name).Scan(&a.ID, &a.Name, &a.Type, &a.Currency)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Not found
+		}
+		return nil, err
+	}
+	return &a, nil
+}

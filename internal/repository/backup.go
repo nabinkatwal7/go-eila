@@ -28,12 +28,12 @@ func (r *Repository) ExportDataToJSON(filepath string) error {
 	if err != nil { return err }
 
 	// 2. Fetch Categories
-	// We didn't implement GetAllCategories yet in this session, assume it exists or add it.
-	// r.GetAllCategories() ... let's skip for now or implement.
-	// For MVP of "Export", let's dump Accounts.
+	categories, err := r.GetAllCategories()
+	if err != nil { return err }
 
 	data := BackupData{
-		Accounts: accounts,
+		Accounts:   accounts,
+		Categories: categories,
 	}
 
 	file, err := os.Create(filepath)

@@ -1,331 +1,134 @@
 # MyTrack
 
-**A premium, EILA-style personal finance application built with Go and Fyne**
+**A premium, professional-grade personal finance application built with Go and Fyne.**
 
-MyTrack is a privacy-focused, double-entry accounting money tracker that helps you manage your finances with professional-grade features. All data is stored locally in SQLite—no cloud, no tracking, complete privacy.
+MyTrack is a privacy-focused, double-entry accounting money tracker that helps you manage your finances with professional-grade features. All data is stored locally in SQLite - no cloud, no tracking, complete privacy.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Go Version](https://img.shields.io/badge/go-1.20+-00ADD8.svg)
+## Overview
 
-## ✨ Features
+MyTrack is designed for users who want granular control over their finances. It combines the rigor of double-entry accounting with a modern, fast, and intuitive user interface.
 
-### 📊 Core Money Tracking (The 4 Pillars)
-- **Expenses**: Track daily spending with categories
-- **Income**: Record all income sources
-- **Assets**: Monitor cash, bank accounts, investments
-- **Liabilities**: Track debts and credit cards
+## Highlights
 
-### 💰 Double-Entry Accounting
-- Professional accounting system with balanced transactions
-- Every transaction has debits and credits
-- Accurate balance calculations
-- Support for split transactions (multiple categories in one transaction)
+*   **Privacy First**: Your financial data never leaves your device.
+*   **Double-Entry Accuracy**: Every transaction is balanced, ensuring zero discrepancies.
+*   **Performance**: Native Go application with minimal resource footprint.
+*   **Cross-Platform**: Runs on Windows, macOS, and Linux.
 
-### 📈 Dashboard & Insights
-- Real-time net worth calculation
-- Income vs Expense trends (6-month chart)
-- Account balances
-- Category-wise spending breakdown
+## Features
 
-### 🎯 Budgets
-- Set monthly budgets per category
-- Real-time progress tracking
-- Visual indicators for budget health
-- Overspending alerts
+### Core Money Tracking
+*   **Expenses**: Track daily spending with detailed categorization.
+*   **Income**: Record various income sources.
+*   **Assets**: Monitor cash, bank accounts, and investment portfolios.
+*   **Liabilities**: Track debts, credit cards, and loans.
 
-### 🔄 Smart Features
-- **Recurring Transaction Detection**: Automatically identifies subscriptions
-- **Spending Anomaly Detection**: Flags unusual large transactions
-- **Rule Engine**: Auto-categorize transactions based on patterns
-- **Net Worth Forecasting**: Project future wealth based on trends
+### Dashboard & Insights
+*   **Real-time Net Worth**: Instant calculation of your financial health.
+*   **Trend Analysis**: 6-month income vs. expense charts.
+*   **Account Balances**: Live updates of all asset and liability accounts.
 
-### 🛠️ Tools
-- Debt payoff calculator
-- Tax calculator
-- Invoice generation
-- Multi-currency support
+### Budget Management
+*   **Monthly Budgets**: Set spending limits per category.
+*   **Visual Tracking**: Progress bars indicating budget utilization.
+*   **Alerts**: Visual indicators when budgets are exceeded.
 
-### ⌨️ Premium UX
-- **Command Palette** (Ctrl+K): Quick access to all features
-- Fast transaction entry
-- Keyboard shortcuts
-- Clean, modern UI
+### Smart Operations
+*   **Split Transactions**: Categorize a single transaction across multiple categories.
+*   **Recurring Detection**: Automatically identify subscription patterns.
+*   **Anomaly Detection**: Flag unusual large transactions.
+*   **Data Export**: Backup your data to JSON for portability.
 
-## 🏗️ Architecture
+### Power User Tools
+*   **Command Palette (Ctrl+K)**: Rapid navigation to any feature.
+*   **Keyboard Shortcuts**: Fast data entry.
 
-### Database Schema (SQLite)
+## Architecture
+
+MyTrack relies on a robust stack:
+
+*   **Language**: Go (Golang) 1.20+
+*   **GUI Framework**: Fyne v2
+*   **Database**: SQLite (via `modernc.org/sqlite` pure Go driver)
+*   **Architecture Pattern**: Repository Pattern with MVC-like separation.
+
+### Data Model
+
+The application uses a strict double-entry system. A `Transaction` consists of multiple `Splits`. The sum of all splits in a transaction must always equal zero.
 
 ```
-accounts
-├── id (PK)
-├── name
-├── type (Cash, Bank, Card, Invest, Expense, Income, Liability, Equity)
-└── currency
-
-categories
-├── id (PK)
-├── name
-├── icon
-├── color
-└── parent_id (FK)
-
-transactions
-├── id (PK)
-├── date
-├── description (payee)
-├── note
-└── status
-
-splits (double-entry legs)
-├── id (PK)
-├── transaction_id (FK)
-├── account_id (FK)
-├── category_id (FK)
-├── amount (in cents)
-├── currency
-└── exchange_rate
-
-budgets
-├── id (PK)
-├── category_id (FK)
-├── amount
-└── period
-
-rules (auto-categorization)
-├── id (PK)
-├── pattern
-├── target_category_id (FK)
-├── target_payee
-└── target_note
+Transaction
+├── ID
+├── Date
+├── Description
+└── Splits []
+    ├── AccountID (Source/Destination)
+    ├── CategoryID (Optional)
+    └── Amount (Positive for Debit/Expense, Negative for Credit/Income)
 ```
 
-### Double-Entry Accounting Example
-
-**Expense Transaction**: Spent $50 on groceries from Cash account
-```
-Splits:
-1. Cash (Asset)      -$50  (Credit - decrease)
-2. Expenses (Expense) +$50  (Debit - increase)
-Category: Food
-```
-
-**Income Transaction**: Received $1000 salary to Bank account
-```
-Splits:
-1. Bank (Asset)      +$1000 (Debit - increase)
-2. Income (Income)   -$1000 (Credit - decrease)
-Category: Salary
-```
-
-The sum of all splits in a transaction must equal zero (balanced).
-
-## 🚀 Getting Started
+## Installation
 
 ### Prerequisites
 
-1. **Go** (1.20 or later)
-   ```bash
-   go version
-   ```
+1.  **Go**: Version 1.20 or later.
+2.  **C Compiler**: Required for Fyne's graphical drivers (OpenGL).
+    *   **Windows**: TDM-GCC or MinGW-w64.
+    *   **Linux**: GCC (`sudo apt install gcc libgl1-mesa-dev xorg-dev`).
+    *   **macOS**: Xcode Command Line Tools.
 
-2. **C Compiler** (Required for Fyne GUI framework)
-   - **Windows**: Install [TDM-GCC](https://jmeubank.github.io/tdm-gcc/) or [MinGW-w64](https://www.mingw-w64.org/)
-   - **Linux**:
-     ```bash
-     sudo apt install gcc libgl1-mesa-dev xorg-dev
-     ```
-   - **macOS**: Install Xcode Command Line Tools
-     ```bash
-     xcode-select --install
-     ```
+### Steps
 
-### Installation
+1.  **Clone the Repository**
+    ```bash
+    git clone https://github.com/nabinkatwal7/go-eila.git
+    cd go-eila
+    ```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/nabinkatwal7/go-eila.git
-   cd go-eila
-   ```
+2.  **Install Dependencies**
+    ```bash
+    go mod download
+    ```
 
-2. **Install dependencies**
-   ```bash
-   go mod download
-   ```
+3.  **Run Application**
+    ```bash
+    go run cmd/mytrack/main.go
+    ```
 
-3. **Run the application**
-   ```bash
-   go run cmd/mytrack/main.go
-   ```
+## Usage Guide
 
-   The application will:
-   - Create `mytrack.db` in the current directory
-   - Seed default accounts and categories
-   - Open the GUI window
+### First Run
+On the first launch, MyTrack will create a local `mytrack.db` file and seed it with default accounts (Cash, General Expenses) and categories (Food, Transport).
 
-### Building
+### Adding Transactions
+1.  Click **+ Add New** in the sidebar.
+2.  Select **Simple** for one-off expenses or **Split** for complex receipts.
+3.  Enter amount, date, and select Account/Category.
+4.  Click Save.
 
-To create a standalone executable:
+### Managing Budgets
+1.  Navigate to the **Budgets** view.
+2.  Click **Set/Update Budget**.
+3.  Select a category and define the monthly limit.
 
+## Development
+
+### Project Structure
+*   `cmd/mytrack/`: Entry point.
+*   `internal/model/`: Domain models (structs).
+*   `internal/repository/`: Database logic and queries.
+*   `internal/ui/`: Fyne UI components and view logic.
+
+### Building for Production
+To create a standalone binary:
 ```bash
-go build -o mytrack.exe cmd/mytrack/main.go
+go build -ldflags="-s -w" -o mytrack.exe cmd/mytrack/main.go
 ```
 
-## 📖 Usage Guide
+## Contributing
 
-### Adding a Transaction
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-1. **Quick Add**: Click the "+ Add New" button in the sidebar
-2. **Choose Mode**:
-   - **Simple**: Single category transaction
-   - **Split**: Multiple categories in one transaction
-3. **Fill Details**:
-   - Type (Expense/Income)
-   - Amount
-   - Date
-   - Account (where money comes from/goes to)
-   - Category
-   - Note (optional)
-4. **Save**: Transaction is saved and modal closes
+## License
 
-### Managing Accounts
-
-1. Navigate to **Accounts** view
-2. Click **"New Account"**
-3. Enter:
-   - Name (e.g., "Savings Account")
-   - Type (Cash, Bank, Card, Invest)
-   - Currency (USD, EUR, GBP, NPR, JPY)
-4. View all accounts with real-time balances
-
-### Setting Budgets
-
-1. Navigate to **Budgets** view
-2. Click **"New Budget"**
-3. Select category and set monthly limit
-4. Track progress in real-time
-
-### Using Command Palette
-
-Press **Ctrl+K** to open the command palette for quick navigation:
-- Add Transaction
-- Add Account
-- Go to Dashboard
-- Go to Transactions
-- Go to Budgets
-- And more...
-
-### Viewing Insights
-
-- **Dashboard**: Overview of financial health
-- **Transactions**: Complete transaction history
-- **Recurring**: Detected subscriptions
-- **Alerts**: Spending anomalies
-- **Forecast**: Net worth projection
-
-## 🗂️ Project Structure
-
-```
-mytrack/
-├── cmd/
-│   └── mytrack/
-│       └── main.go           # Application entry point
-├── internal/
-│   ├── model/                # Data models
-│   │   ├── models.go         # Account, Transaction, Split, Category
-│   │   ├── anomaly.go        # Anomaly detection models
-│   │   ├── recurring.go      # Subscription models
-│   │   └── stats.go          # Statistics models
-│   ├── repository/           # Database layer
-│   │   ├── db.go             # Database setup & schema
-│   │   └── repository.go     # CRUD operations
-│   └── ui/                   # Fyne UI components
-│       ├── app.go            # Main app structure
-│       ├── dashboard.go      # Dashboard view
-│       ├── transactions.go   # Transaction list
-│       ├── add_transaction.go # Transaction modal
-│       ├── accounts.go       # Accounts view
-│       ├── budgets.go        # Budget management
-│       ├── command_palette.go # Quick actions
-│       └── ...               # Other views
-├── go.mod
-├── go.sum
-└── README.md
-```
-
-## 🔧 Development
-
-### Database Migrations
-
-The schema is automatically created on first run. For a fresh start:
-
-```bash
-rm mytrack.db
-go run cmd/mytrack/main.go
-```
-
-### Adding New Features
-
-1. **Model**: Define data structure in `internal/model/`
-2. **Repository**: Add CRUD methods in `internal/repository/repository.go`
-3. **UI**: Create view in `internal/ui/`
-4. **Wire Up**: Add navigation in `app.go` and `command_palette.go`
-
-### Testing
-
-```bash
-go test ./...
-```
-
-## 🐛 Troubleshooting
-
-### "C compiler 'gcc' not found"
-
-**Solution**: Install a C compiler (see Prerequisites above)
-
-### Application hangs on startup
-
-**Solution**: This was fixed in recent updates. Ensure you're using the latest version.
-
-### Transactions not saving
-
-**Solution**: Check that:
-1. You have selected an account and category
-2. Amount is a valid number
-3. Database file `mytrack.db` has write permissions
-
-### Window doesn't open
-
-**Solution**:
-- On Linux, ensure X11 or Wayland is running
-- On Windows, check Windows Defender isn't blocking the app
-- Try running with `CGO_ENABLED=1 go run cmd/mytrack/main.go`
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- [Fyne](https://fyne.io/) - Cross-platform GUI toolkit
-- [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) - Pure Go SQLite driver
-- Inspired by EILA and other modern finance apps
-
-## 📧 Contact
-
-Nabin Katwal - [@nabinkatwal7](https://github.com/nabinkatwal7)
-
-Project Link: [https://github.com/nabinkatwal7/go-eila](https://github.com/nabinkatwal7/go-eila)
-
----
-
-**Built with ❤️ using Go and Fyne**
+This project is open source and available under the [MIT License](LICENSE).

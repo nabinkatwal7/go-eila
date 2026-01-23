@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -101,9 +102,21 @@ func (a *App) createSimpleForm(w fyne.Window) fyne.CanvasObject {
 	)
 
 	saveBtn := widget.NewButtonWithIcon("Save Simple", theme.DocumentSaveIcon(), func() {
-		priceFloat, _ := strconv.ParseFloat(amountEntry.Text, 64)
-		amountCents := int64(priceFloat * 100)
-		date, _ := time.Parse("2006-01-02", dateEntry.Text)
+		// Validation
+		amountVal, err := ValidateAmount(amountEntry.Text)
+		if err != nil {
+			dialog.ShowError(errors.New("Invalid Amount: "+err.Error()), w)
+			return
+		}
+
+		date, err := ValidateDate(dateEntry.Text)
+		if err != nil {
+			dialog.ShowError(errors.New("Invalid Date: "+err.Error()), w)
+			return
+		}
+
+		// Logic to save
+		amountCents := int64(amountVal * 100)
 
 		// Get actual IDs from selections
 		accountID := accountNameToID[accountSelect.Selected]
@@ -277,8 +290,19 @@ func (a *App) createSplitForm(w fyne.Window) fyne.CanvasObject {
 	addBtn := widget.NewButtonWithIcon("Add Split", theme.ContentAddIcon(), addSplitRow)
 
 	saveBtn := widget.NewButtonWithIcon("Save Split Transaction", theme.DocumentSaveIcon(), func() {
+		// Validation
+		date, err := ValidateDate(dateEntry.Text)
+		if err != nil {
+			dialog.ShowError(errors.New("Invalid Date: "+err.Error()), w)
+			return
+		}
+
+		if descEntry.Text == "" {
+			dialog.ShowError(errors.New("Payee is required"), w)
+			return
+		}
+
 		// Logic to save
-		date, _ := time.Parse("2006-01-02", dateEntry.Text)
 		t := &model.Transaction{
 			Date: date,
 			Description: descEntry.Text,

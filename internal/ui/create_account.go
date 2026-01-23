@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"errors"
+
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
@@ -32,6 +34,23 @@ func (a *App) ShowCreateAccountModal() {
 
 	dialog.ShowForm("New Account", "Create", "Cancel", items, func(confirm bool) {
 		if confirm {
+			// Validation
+			if nameEntry.Text == "" {
+				dialog.ShowError(errors.New("Account Name is required"), a.Window)
+				return
+			}
+
+			// Check for duplicate
+			existing, err := a.Repo.GetAccountByName(nameEntry.Text)
+			if err != nil {
+				dialog.ShowError(err, a.Window)
+				return
+			}
+			if existing != nil {
+				dialog.ShowError(errors.New("Account with this name already exists"), a.Window)
+				return
+			}
+
 			acc := &model.Account{
 				Name: nameEntry.Text,
 				Type: model.AccountType(typeSelect.Selected),
@@ -41,6 +60,7 @@ func (a *App) ShowCreateAccountModal() {
 				dialog.ShowError(err, a.Window)
 			} else {
 				a.ContentContainer.Refresh()
+				dialog.ShowInformation("Success", "Account created successfully", a.Window)
 			}
 		}
 	}, a.Window)
