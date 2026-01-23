@@ -28,6 +28,8 @@ func (a *App) SetupCommandPalette() {
 		{"Go to Alerts", "View spending anomalies", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewAnomaliesView(a.Repo)}; a.ContentContainer.Refresh() }},
 		{"Go to Settings", "Backup and Data options", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewSettingsView(a.Repo, a.Window)}; a.ContentContainer.Refresh() }},
 		{"Go to Forecast", "Project future net worth", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewForecastView(a.Repo)}; a.ContentContainer.Refresh() }},
+		{"Go to Tools", "Calculators (Debt, Tax)", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewToolsView(a.Repo)}; a.ContentContainer.Refresh() }},
+		{"Go to Invoicing", "Create invoices", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewInvoicingView(a.Repo)}; a.ContentContainer.Refresh() }},
 	}
 
 	// Register Shortcut

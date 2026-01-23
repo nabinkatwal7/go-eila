@@ -5,7 +5,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
 	"github.com/nabinkatwal7/go-eila/internal/repository"
 	"github.com/nabinkatwal7/go-eila/internal/ui"
 )
@@ -28,7 +27,6 @@ func main() {
 
 	myApp := ui.NewApp(myFyneApp, myWindow, repo)
 	myApp.Init()
-	myApp.ContentContainer = container.NewStack(ui.NewDashboard(repo))
 
 	// 4. Run
 	myApp.Run()

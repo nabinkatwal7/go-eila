@@ -53,6 +53,31 @@ func (r *Repository) GetAllAccounts() ([]model.Account, error) {
 	return accounts, nil
 }
 
+func (r *Repository) GetAllCategories() ([]model.Category, error) {
+	rows, err := r.DB.Query("SELECT id, name, icon, color FROM categories")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []model.Category
+	for rows.Next() {
+		var c model.Category
+		var icon, color sql.NullString
+		if err := rows.Scan(&c.ID, &c.Name, &icon, &color); err != nil {
+			return nil, err
+		}
+		if icon.Valid {
+			c.Icon = icon.String
+		}
+		if color.Valid {
+			c.Color = color.String
+		}
+		categories = append(categories, c)
+	}
+	return categories, nil
+}
+
 func (r *Repository) GetAccountBalance(accountID int64) (float64, error) {
 	// Dynamically calculate balance from splits
 	// Sum(amount) where account_id = ?

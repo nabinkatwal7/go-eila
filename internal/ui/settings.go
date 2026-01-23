@@ -32,11 +32,25 @@ func NewSettingsView(repo *repository.Repository, w fyne.Window) fyne.CanvasObje
 		dlg.Show()
 	})
 
+	snapshotBtn := widget.NewButton("Create Time-Travel Snapshot", func() {
+		// Mock snapshot creation
+		dialog.ShowInformation("Snapshot Created", "A snapshot of your database has been saved to 'snapshots/req_id.db'. (Mock)", w)
+	})
+
+	rolloverBtn := widget.NewButton("Run Budget Rollover", func() {
+		// Mock rollover logic
+		dialog.ShowInformation("Rollover Complete", "Unused budget from last month has been carried forward to current month. (Mock)", w)
+	})
+
 	return container.NewVBox(
 		header,
 		widget.NewSeparator(),
 		widget.NewLabel("Data Integrity"),
 		exportBtn,
+		snapshotBtn,
+		widget.NewSeparator(),
+		widget.NewLabel("Advanced Features"),
+		rolloverBtn,
 		widget.NewLabel("More settings coming soon..."),
 	)
 }
