@@ -7,7 +7,7 @@ Thank you for your interest in contributing to MyTrack! We welcome contributions
 1.  **Fork the repository** on GitHub.
 2.  **Clone your fork** locally:
     ```bash
-    git clone https://github.com/YOUR_USERNAME/go-eila.git
+    git clone https://github.com/nabinkatwal7/go-eila.git
     cd go-eila
     ```
 3.  **Create a new branch** for your feature or bug fix:
