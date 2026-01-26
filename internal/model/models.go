@@ -79,3 +79,19 @@ type Rule struct {
 	TargetPayee    string
 	TargetNote     string
 }
+
+// CategoryBreakdown represents spending by category
+type CategoryBreakdown struct {
+	CategoryID   int64
+	CategoryName string
+	Color        string
+	Amount       float64
+}
+
+// NetWorthPoint represents net worth at a point in time
+type NetWorthPoint struct {
+	Month      string
+	Assets     float64
+	Liabilities float64
+	NetWorth   float64
+}

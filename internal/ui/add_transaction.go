@@ -404,3 +404,217 @@ func NewSplitRow(categoryNames []string, onChange func()) *SplitRow {
 		AmountEntry: amt,
 	}
 }
+
+func (a *App) ShowEditTransactionModal(txID int64) {
+	// Load transaction
+	tx, err := a.Repo.GetTransactionByID(txID)
+	if err != nil || tx == nil {
+		dialog.ShowError(errors.New("Transaction not found"), a.Window)
+		return
+	}
+
+	// Create window
+	w := a.FyneApp.NewWindow("Edit Transaction")
+
+	// Load accounts and categories
+	accounts, err := a.Repo.GetAllAccounts()
+	if err != nil {
+		dialog.ShowError(err, w)
+		return
+	}
+
+	categories, err := a.Repo.GetAllCategories()
+	if err != nil {
+		dialog.ShowError(err, w)
+		return
+	}
+
+	// Create form fields
+	dateEntry := widget.NewEntry()
+	dateEntry.SetText(tx.Date.Format("2006-01-02"))
+
+	descEntry := widget.NewEntry()
+	descEntry.SetText(tx.Description)
+
+	noteEntry := widget.NewEntry()
+	noteEntry.SetText(tx.Note)
+
+	statusSelect := widget.NewSelect([]string{
+		string(model.TransactionStatusPending),
+		string(model.TransactionStatusCleared),
+		string(model.TransactionStatusReconciled),
+	}, nil)
+	statusSelect.SetSelected(string(tx.Status))
+
+	// For simple transactions, show amount and account/category
+	// For split transactions, show all splits
+	var formContent fyne.CanvasObject
+
+	if len(tx.Splits) == 2 {
+		// Simple transaction - show simple form
+		var amountCents int64
+		var accountID int64
+		var categoryID *int64
+
+		for _, s := range tx.Splits {
+			if s.Amount > 0 {
+				amountCents = s.Amount
+				categoryID = s.CategoryID
+			} else {
+				accountID = s.AccountID
+			}
+		}
+
+		amountEntry := widget.NewEntry()
+		amountEntry.SetText(fmt.Sprintf("%.2f", float64(amountCents)/100.0))
+
+		accountNames := make([]string, 0)
+		accountNameToID := make(map[string]int64)
+		for _, acc := range accounts {
+			if acc.Type == model.AccountTypeCash || acc.Type == model.AccountTypeBank ||
+				acc.Type == model.AccountTypeCard || acc.Type == model.AccountTypeInvest {
+				accountNames = append(accountNames, acc.Name)
+				accountNameToID[acc.Name] = acc.ID
+			}
+		}
+
+		categoryNames := make([]string, 0)
+		categoryNameToID := make(map[string]int64)
+		for _, cat := range categories {
+			categoryNames = append(categoryNames, cat.Name)
+			categoryNameToID[cat.Name] = cat.ID
+		}
+
+		accountSelect := widget.NewSelect(accountNames, nil)
+		for _, acc := range accounts {
+			if acc.ID == accountID {
+				accountSelect.SetSelected(acc.Name)
+				break
+			}
+		}
+
+		categorySelect := widget.NewSelect(categoryNames, nil)
+		if categoryID != nil {
+			for _, cat := range categories {
+				if cat.ID == *categoryID {
+					categorySelect.SetSelected(cat.Name)
+					break
+				}
+			}
+		}
+
+		formContent = widget.NewForm(
+			widget.NewFormItem("Date", dateEntry),
+			widget.NewFormItem("Description", descEntry),
+			widget.NewFormItem("Note", noteEntry),
+			widget.NewFormItem("Status", statusSelect),
+			widget.NewFormItem("Amount", amountEntry),
+			widget.NewFormItem("Account", accountSelect),
+			widget.NewFormItem("Category", categorySelect),
+		)
+
+		saveBtn := widget.NewButton("Save", func() {
+			// Validate and update
+			date, err := ValidateDate(dateEntry.Text)
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+
+			amount, err := ValidateAmount(amountEntry.Text)
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+
+			amountCents := int64(amount * 100)
+			accID := accountNameToID[accountSelect.Selected]
+			catID := categoryNameToID[categorySelect.Selected]
+
+			// Find expense/income accounts
+			var expenseAccountID, incomeAccountID int64
+			for _, acc := range accounts {
+				if acc.Type == model.AccountTypeExpense {
+					expenseAccountID = acc.ID
+				}
+				if acc.Type == model.AccountTypeIncome {
+					incomeAccountID = acc.ID
+				}
+			}
+
+			tx.Date = date
+			tx.Description = descEntry.Text
+			tx.Note = noteEntry.Text
+			tx.Status = model.TransactionStatus(statusSelect.Selected)
+
+			// Determine if expense or income based on original splits
+			isExpense := true
+			for _, s := range tx.Splits {
+				if s.CategoryID != nil && s.Amount > 0 {
+					isExpense = true
+					break
+				}
+			}
+
+			if isExpense {
+				tx.Splits = []model.Split{
+					{AccountID: accID, Amount: -amountCents, Currency: "USD", ExchangeRate: 1.0},
+					{AccountID: expenseAccountID, CategoryID: &catID, Amount: amountCents, Currency: "USD", ExchangeRate: 1.0},
+				}
+			} else {
+				tx.Splits = []model.Split{
+					{AccountID: accID, Amount: amountCents, Currency: "USD", ExchangeRate: 1.0},
+					{AccountID: incomeAccountID, CategoryID: &catID, Amount: -amountCents, Currency: "USD", ExchangeRate: 1.0},
+				}
+			}
+
+			if err := a.Repo.UpdateTransaction(tx); err != nil {
+				dialog.ShowError(err, w)
+			} else {
+				dialog.ShowInformation("Success", "Transaction updated", a.Window)
+				w.Close()
+				a.ContentContainer.Refresh()
+			}
+		})
+
+		formContent = container.NewVBox(formContent, saveBtn)
+	} else {
+		// Split transaction - show message that editing splits is complex
+		formContent = container.NewVBox(
+			widget.NewForm(
+				widget.NewFormItem("Date", dateEntry),
+				widget.NewFormItem("Description", descEntry),
+				widget.NewFormItem("Note", noteEntry),
+				widget.NewFormItem("Status", statusSelect),
+			),
+			widget.NewLabel("Note: Split transactions can only have their header edited. To modify splits, delete and recreate."),
+		)
+
+		saveBtn := widget.NewButton("Save", func() {
+			date, err := ValidateDate(dateEntry.Text)
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+
+			tx.Date = date
+			tx.Description = descEntry.Text
+			tx.Note = noteEntry.Text
+			tx.Status = model.TransactionStatus(statusSelect.Selected)
+
+			if err := a.Repo.UpdateTransaction(tx); err != nil {
+				dialog.ShowError(err, w)
+			} else {
+				dialog.ShowInformation("Success", "Transaction updated", a.Window)
+				w.Close()
+				a.ContentContainer.Refresh()
+			}
+		})
+
+		formContent = container.NewVBox(formContent, saveBtn)
+	}
+
+	w.Resize(fyne.NewSize(500, 600))
+	w.SetContent(container.NewPadded(formContent))
+	w.Show()
+}

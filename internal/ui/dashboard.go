@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"image/color"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -26,24 +27,46 @@ func NewDashboard(repo *repository.Repository) fyne.CanvasObject {
 
 	pillars := container.NewGridWithColumns(4, incomeCard, expenseCard, assetCard, netWorthCard)
 
-	// Chart
+	// Charts
 	chartStats, _ := repo.GetMonthlyStats(6)
-	chart := NewBarChart(chartStats)
+	incomeExpenseChart := NewBarChart(chartStats)
 
-	chartArea := container.NewVBox(
+	// Net Worth Progression
+	netWorthHistory, _ := repo.GetNetWorthHistory(12)
+	netWorthChart := NewLineChart(netWorthHistory)
+
+	// Category Breakdown (last 30 days)
+	now := time.Now()
+	thirtyDaysAgo := now.AddDate(0, 0, -30)
+	categoryBreakdown, _ := repo.GetCategoryBreakdown(&thirtyDaysAgo, &now)
+	categoryChart := NewPieChart(categoryBreakdown)
+
+	incomeExpenseArea := container.NewVBox(
 		widget.NewLabelWithStyle("Income vs Expense (6 Months)", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		container.NewCenter(chart),
+		container.NewCenter(incomeExpenseChart),
 	)
 
-	// Placeholder for header, assuming it will be defined elsewhere or is a global variable
-	// For now, let's define a simple header
+	netWorthArea := container.NewVBox(
+		widget.NewLabelWithStyle("Net Worth Progression (12 Months)", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		container.NewCenter(netWorthChart),
+	)
+
+	categoryArea := container.NewVBox(
+		widget.NewLabelWithStyle("Category Breakdown (Last 30 Days)", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		container.NewCenter(categoryChart),
+	)
+
 	header := widget.NewLabelWithStyle("Dashboard", fyne.TextAlignLeading, fyne.TextStyle{Bold: true, Monospace: true})
 
 	return container.NewVScroll(container.NewVBox(
 		header,
 		pillars,
 		widget.NewSeparator(),
-		chartArea,
+		incomeExpenseArea,
+		widget.NewSeparator(),
+		netWorthArea,
+		widget.NewSeparator(),
+		categoryArea,
 	))
 }
 

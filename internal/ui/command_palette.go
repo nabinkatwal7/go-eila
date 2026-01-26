@@ -21,7 +21,7 @@ func (a *App) SetupCommandPalette() {
 		{"Add Transaction", "Open the transaction creation modal", a.ShowAddTransactionModal},
 		{"Add Account", "Create a new financial account", a.ShowCreateAccountModal},
 		{"Go to Dashboard", "View financial overview", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewDashboard(a.Repo)}; a.ContentContainer.Refresh() }},
-		{"Go to Transactions", "View transaction history", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewTransactionsView(a.Repo)}; a.ContentContainer.Refresh() }},
+		{"Go to Transactions", "View transaction history", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewTransactionsView(a.Repo, a)}; a.ContentContainer.Refresh() }},
 		{"Go to Accounts", "Manage accounts", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewAccountsView(a.Repo, a)}; a.ContentContainer.Refresh() }},
 		{"Go to Budgets", "Manage spending limits", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewBudgetsView(a.Repo, a)}; a.ContentContainer.Refresh() }},
 		{"Go to Recurring", "View detected subscriptions", func() { a.ContentContainer.Objects = []fyne.CanvasObject{NewRecurringView(a.Repo)}; a.ContentContainer.Refresh() }},

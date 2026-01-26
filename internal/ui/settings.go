@@ -18,7 +18,9 @@ func NewSettingsView(repo *repository.Repository, w fyne.Window) fyne.CanvasObje
 				dialog.ShowError(err, w)
 				return
 			}
-			if writer == nil { return } // Cancelled
+			if writer == nil {
+				return // Cancelled
+			}
 
 			err = repo.ExportDataToJSON(writer.URI().Path())
 			if err != nil {
@@ -29,6 +31,77 @@ func NewSettingsView(repo *repository.Repository, w fyne.Window) fyne.CanvasObje
 		}, w)
 		dlg.SetFileName("mytrack_backup.json")
 		dlg.SetFilter(storage.NewExtensionFileFilter([]string{".json"}))
+		dlg.Show()
+	})
+
+	importBtn := widget.NewButton("Import Data (JSON)", func() {
+		dlg := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+			if reader == nil {
+				return // Cancelled
+			}
+			defer reader.Close()
+
+			// Confirm before importing
+			dialog.ShowConfirm("Import Data",
+				"This will add data from the backup file. Continue?",
+				func(confirmed bool) {
+					if confirmed {
+						err = repo.ImportDataFromJSON(reader.URI().Path())
+						if err != nil {
+							dialog.ShowError(err, w)
+						} else {
+							dialog.ShowInformation("Success", "Data imported successfully.", w)
+						}
+					}
+				}, w)
+		}, w)
+		dlg.SetFilter(storage.NewExtensionFileFilter([]string{".json"}))
+		dlg.Show()
+	})
+
+	csvImportBtn := widget.NewButton("Import Transactions (CSV)", func() {
+		dlg := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+			if reader == nil {
+				return // Cancelled
+			}
+			defer reader.Close()
+
+			// Show dialog for account/category selection
+			accountEntry := widget.NewEntry()
+			accountEntry.SetPlaceHolder("Default account name (optional)")
+			categoryEntry := widget.NewEntry()
+			categoryEntry.SetPlaceHolder("Default category name (optional)")
+
+			form := widget.NewForm(
+				widget.NewFormItem("Default Account", accountEntry),
+				widget.NewFormItem("Default Category", categoryEntry),
+			)
+
+			importDlg := dialog.NewCustomConfirm("CSV Import", "Import", "Cancel", form,
+				func(confirmed bool) {
+					if confirmed {
+						accountName := accountEntry.Text
+						categoryName := categoryEntry.Text
+						err = repo.ImportTransactionsFromCSV(reader.URI().Path(), accountName, categoryName)
+						if err != nil {
+							dialog.ShowError(err, w)
+						} else {
+							dialog.ShowInformation("Success", "Transactions imported successfully.", w)
+						}
+					}
+				}, w)
+			importDlg.Resize(fyne.NewSize(400, 200))
+			importDlg.Show()
+		}, w)
+		dlg.SetFilter(storage.NewExtensionFileFilter([]string{".csv"}))
 		dlg.Show()
 	})
 
@@ -45,11 +118,13 @@ func NewSettingsView(repo *repository.Repository, w fyne.Window) fyne.CanvasObje
 	return container.NewVBox(
 		header,
 		widget.NewSeparator(),
-		widget.NewLabel("Data Integrity"),
+		widget.NewLabel("Data Export/Import"),
 		exportBtn,
-		snapshotBtn,
+		importBtn,
+		csvImportBtn,
 		widget.NewSeparator(),
 		widget.NewLabel("Advanced Features"),
+		snapshotBtn,
 		rolloverBtn,
 		widget.NewLabel("More settings coming soon..."),
 	)

@@ -4,15 +4,15 @@ This document outlines the planned future features and improvements for MyTrack.
 
 ## Short Term
 
-- [ ] **Transaction Management**
+- [x] **Transaction Management**
     - Edit existing transactions
     - Delete transactions (with confirmation)
     - Search/Filter transactions by date, amount, or description
-- [ ] **Data Visualization**
+- [x] **Data Visualization**
     - Implement real charts in Dashboard (replacing placeholders)
     - Net worth progression graph
     - Category breakdown pie chart
-- [ ] **Import/Export**
+- [x] **Import/Export**
     - CSV Import for bank statements
     - Full database backup/restore to a single file
 

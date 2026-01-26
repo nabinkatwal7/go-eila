@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
@@ -66,4 +67,108 @@ func NewBarChart(stats []model.MonthlyStat) fyne.CanvasObject {
 
 	// Scrollable if too many months?
 	return container.NewPadded(chartContainer)
+}
+
+// NewLineChart creates a line chart for net worth progression
+func NewLineChart(points []model.NetWorthPoint) fyne.CanvasObject {
+	if len(points) == 0 {
+		return widget.NewLabel("No data for chart")
+	}
+
+	maxHeight := float32(200)
+	pointSpacing := float32(40)
+	chartWidth := float32(len(points)) * pointSpacing
+
+	// Find max and min values for scaling
+	var maxVal, minVal float64
+	for _, p := range points {
+		if p.NetWorth > maxVal {
+			maxVal = p.NetWorth
+		}
+		if p.NetWorth < minVal {
+			minVal = p.NetWorth
+		}
+	}
+	rangeVal := maxVal - minVal
+	if rangeVal == 0 {
+		rangeVal = 1
+	}
+
+	chartContainer := container.NewWithoutLayout()
+	baseY := float32(200)
+
+	// Draw line connecting points
+	for i := 0; i < len(points)-1; i++ {
+		x1 := float32(i) * pointSpacing
+		y1 := baseY - float32((points[i].NetWorth-minVal)/rangeVal)*maxHeight
+		x2 := float32(i+1) * pointSpacing
+		y2 := baseY - float32((points[i+1].NetWorth-minVal)/rangeVal)*maxHeight
+
+		line := canvas.NewLine(color.RGBA{0, 100, 200, 255})
+		line.StrokeWidth = 2
+		line.Position1 = fyne.NewPos(x1, y1)
+		line.Position2 = fyne.NewPos(x2, y2)
+		chartContainer.Add(line)
+	}
+
+	// Draw points and labels
+	for i, p := range points {
+		x := float32(i) * pointSpacing
+		y := baseY - float32((p.NetWorth-minVal)/rangeVal)*maxHeight
+
+		// Point
+		point := canvas.NewCircle(color.RGBA{0, 100, 200, 255})
+		point.Resize(fyne.NewSize(6, 6))
+		point.Move(fyne.NewPos(x-3, y-3))
+		chartContainer.Add(point)
+
+		// Label
+		lbl := canvas.NewText(p.Month, color.Black)
+		lbl.TextSize = 9
+		lbl.Move(fyne.NewPos(x-10, baseY+5))
+		chartContainer.Add(lbl)
+	}
+
+	chartContainer.Resize(fyne.NewSize(chartWidth, 250))
+	return container.NewPadded(chartContainer)
+}
+
+// NewPieChart creates a simple pie chart visualization for category breakdown
+func NewPieChart(breakdown []model.CategoryBreakdown) fyne.CanvasObject {
+	if len(breakdown) == 0 {
+		return widget.NewLabel("No data for chart")
+	}
+
+	// Calculate total
+	var total float64
+	for _, b := range breakdown {
+		total += b.Amount
+	}
+
+	if total == 0 {
+		return widget.NewLabel("No spending data")
+	}
+
+	// Create a list view showing categories with visual bars
+	list := widget.NewList(
+		func() int {
+			return len(breakdown)
+		},
+		func() fyne.CanvasObject {
+			return container.NewHBox(
+				widget.NewLabel("Category"),
+				widget.NewLabel("Amount"),
+				widget.NewProgressBar(),
+			)
+		},
+		func(i int, o fyne.CanvasObject) {
+			b := breakdown[i]
+			box := o.(*fyne.Container)
+			box.Objects[0].(*widget.Label).SetText(b.CategoryName)
+			box.Objects[1].(*widget.Label).SetText(fmt.Sprintf("$%.2f", b.Amount))
+			box.Objects[2].(*widget.ProgressBar).SetValue(b.Amount / total)
+		},
+	)
+
+	return container.NewPadded(list)
 }

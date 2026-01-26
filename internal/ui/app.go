@@ -53,7 +53,7 @@ func (a *App) createSidebar() fyne.CanvasObject {
 		a.ContentContainer.Refresh()
 	})
 	transBtn := widget.NewButton("Transactions", func() {
-		a.ContentContainer.Objects = []fyne.CanvasObject{NewTransactionsView(a.Repo)}
+		a.ContentContainer.Objects = []fyne.CanvasObject{NewTransactionsView(a.Repo, a)}
 		a.ContentContainer.Refresh()
 	})
 	// Accounts

@@ -191,6 +191,181 @@ func (r *Repository) GetSplitsForTransaction(txID int64) ([]model.Split, error) 
 	return splits, nil
 }
 
+// GetTransactionByID retrieves a single transaction with its splits
+func (r *Repository) GetTransactionByID(txID int64) (*model.Transaction, error) {
+	query := `SELECT id, date, description, note, status FROM transactions WHERE id = ?`
+	var t model.Transaction
+	err := r.DB.QueryRow(query, txID).Scan(&t.ID, &t.Date, &t.Description, &t.Note, &t.Status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	splits, err := r.GetSplitsForTransaction(txID)
+	if err != nil {
+		return nil, err
+	}
+	t.Splits = splits
+	return &t, nil
+}
+
+// UpdateTransaction updates a transaction and its splits
+// It validates that splits sum to zero and performs the update atomically
+func (r *Repository) UpdateTransaction(t *model.Transaction) error {
+	// Validate balance
+	var sum int64 = 0
+	for _, s := range t.Splits {
+		sum += s.Amount
+	}
+	if sum != 0 {
+		return errors.New("transaction is not balanced (splits sum != 0)")
+	}
+
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Update transaction header
+	updateQuery := `UPDATE transactions SET date = ?, description = ?, note = ?, status = ? WHERE id = ?`
+	_, err = tx.Exec(updateQuery, t.Date, t.Description, t.Note, t.Status, t.ID)
+	if err != nil {
+		return err
+	}
+
+	// Delete existing splits
+	_, err = tx.Exec("DELETE FROM splits WHERE transaction_id = ?", t.ID)
+	if err != nil {
+		return err
+	}
+
+	// Insert new splits
+	splitQuery := `INSERT INTO splits (transaction_id, account_id, category_id, amount, currency, exchange_rate) VALUES (?, ?, ?, ?, ?, ?)`
+	for i := range t.Splits {
+		s := &t.Splits[i]
+		s.TransactionID = t.ID
+		_, err = tx.Exec(splitQuery, s.TransactionID, s.AccountID, s.CategoryID, s.Amount, s.Currency, s.ExchangeRate)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// DeleteTransaction deletes a transaction and all its splits (CASCADE should handle splits, but we'll be explicit)
+func (r *Repository) DeleteTransaction(txID int64) error {
+	// Foreign key CASCADE should handle splits, but let's be explicit for safety
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete splits first
+	_, err = tx.Exec("DELETE FROM splits WHERE transaction_id = ?", txID)
+	if err != nil {
+		return err
+	}
+
+	// Delete transaction
+	_, err = tx.Exec("DELETE FROM transactions WHERE id = ?", txID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// SearchTransactions searches transactions by description, date range, or amount range
+func (r *Repository) SearchTransactions(description string, startDate, endDate *time.Time, minAmount, maxAmount *float64, limit int) ([]model.Transaction, error) {
+	var conditions []string
+	var args []interface{}
+
+	if description != "" {
+		conditions = append(conditions, "t.description LIKE ?")
+		args = append(args, "%"+description+"%")
+	}
+
+	if startDate != nil {
+		conditions = append(conditions, "t.date >= ?")
+		args = append(args, startDate.Format("2006-01-02"))
+	}
+
+	if endDate != nil {
+		conditions = append(conditions, "t.date <= ?")
+		args = append(args, endDate.Format("2006-01-02"))
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Base query
+	query := fmt.Sprintf(`SELECT DISTINCT t.id, t.date, t.description, t.note, t.status
+		FROM transactions t
+		LEFT JOIN splits s ON t.id = s.transaction_id
+		%s
+		ORDER BY t.date DESC LIMIT ?`, whereClause)
+
+	// If amount filters are specified, we need to join with splits and filter
+	if minAmount != nil || maxAmount != nil {
+		amountConditions := []string{}
+		if minAmount != nil {
+			amountConditions = append(amountConditions, "ABS(s.amount) >= ?")
+			args = append(args, int64(*minAmount*100))
+		}
+		if maxAmount != nil {
+			amountConditions = append(amountConditions, "ABS(s.amount) <= ?")
+			args = append(args, int64(*maxAmount*100))
+		}
+		if len(amountConditions) > 0 {
+			if whereClause == "" {
+				whereClause = "WHERE " + strings.Join(amountConditions, " AND ")
+			} else {
+				whereClause += " AND " + strings.Join(amountConditions, " AND ")
+			}
+			query = fmt.Sprintf(`SELECT DISTINCT t.id, t.date, t.description, t.note, t.status
+				FROM transactions t
+				JOIN splits s ON t.id = s.transaction_id
+				%s
+				ORDER BY t.date DESC LIMIT ?`, whereClause)
+		}
+	}
+
+	args = append(args, limit)
+
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []model.Transaction
+	for rows.Next() {
+		var t model.Transaction
+		if err := rows.Scan(&t.ID, &t.Date, &t.Description, &t.Note, &t.Status); err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, t)
+	}
+
+	// Fetch splits for these transactions
+	for i := range transactions {
+		splits, err := r.GetSplitsForTransaction(transactions[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		transactions[i].Splits = splits
+	}
+
+	return transactions, nil
+}
+
 // Stats (Updated for Double Entry)
 
 type DashboardStats struct {
@@ -609,4 +784,117 @@ func (r *Repository) GetAccountByName(name string) (*model.Account, error) {
 		return nil, err
 	}
 	return &a, nil
+}
+
+// GetCategoryBreakdown returns spending by category for a given time period
+func (r *Repository) GetCategoryBreakdown(startDate, endDate *time.Time) ([]model.CategoryBreakdown, error) {
+	query := `
+		SELECT c.id, c.name, c.color, SUM(s.amount) as total
+		FROM categories c
+		JOIN splits s ON s.category_id = c.id
+		JOIN transactions t ON s.transaction_id = t.id
+		WHERE s.amount > 0
+	`
+	var args []interface{}
+
+	if startDate != nil {
+		query += " AND t.date >= ?"
+		args = append(args, startDate.Format("2006-01-02"))
+	}
+	if endDate != nil {
+		query += " AND t.date <= ?"
+		args = append(args, endDate.Format("2006-01-02"))
+	}
+
+	query += " GROUP BY c.id, c.name, c.color ORDER BY total DESC"
+
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var breakdowns []model.CategoryBreakdown
+	for rows.Next() {
+		var cb model.CategoryBreakdown
+		var totalCents sql.NullInt64
+		var color sql.NullString
+		if err := rows.Scan(&cb.CategoryID, &cb.CategoryName, &color, &totalCents); err != nil {
+			continue
+		}
+		if color.Valid {
+			cb.Color = color.String
+		}
+		if totalCents.Valid {
+			cb.Amount = float64(totalCents.Int64) / 100.0
+		}
+		breakdowns = append(breakdowns, cb)
+	}
+	return breakdowns, nil
+}
+
+// GetNetWorthHistory returns net worth values over time
+func (r *Repository) GetNetWorthHistory(months int) ([]model.NetWorthPoint, error) {
+	// Calculate net worth at the end of each month using cumulative sums
+	// SQLite doesn't support window functions in older versions, so we calculate in Go
+	query := `
+		SELECT
+			strftime('%Y-%m', t.date) as month_key,
+			SUM(CASE WHEN a.type IN ('Cash', 'Bank', 'Investment') THEN s.amount * s.exchange_rate ELSE 0 END) as assets,
+			SUM(CASE WHEN a.type = 'Liability' THEN ABS(s.amount * s.exchange_rate) ELSE 0 END) as liabilities
+		FROM transactions t
+		JOIN splits s ON t.id = s.transaction_id
+		JOIN accounts a ON s.account_id = a.id
+		WHERE t.date >= date('now', ?)
+		GROUP BY month_key
+		ORDER BY month_key ASC
+	`
+
+	dateParam := fmt.Sprintf("-%d months", months)
+	rows, err := r.DB.Query(query, dateParam)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type monthlyData struct {
+		MonthKey   string
+		Assets     float64
+		Liabilities float64
+	}
+
+	var monthlyDataList []monthlyData
+	for rows.Next() {
+		var md monthlyData
+		var assetsCents, liabilitiesCents sql.NullInt64
+		if err := rows.Scan(&md.MonthKey, &assetsCents, &liabilitiesCents); err != nil {
+			continue
+		}
+		if assetsCents.Valid {
+			md.Assets = float64(assetsCents.Int64) / 100.0
+		}
+		if liabilitiesCents.Valid {
+			md.Liabilities = float64(liabilitiesCents.Int64) / 100.0
+		}
+		monthlyDataList = append(monthlyDataList, md)
+	}
+
+	// Calculate cumulative values
+	var points []model.NetWorthPoint
+	var cumulativeAssets, cumulativeLiabilities float64
+
+	for _, md := range monthlyDataList {
+		cumulativeAssets += md.Assets
+		cumulativeLiabilities += md.Liabilities
+
+		t, _ := time.Parse("2006-01", md.MonthKey)
+		points = append(points, model.NetWorthPoint{
+			Month:       t.Format("Jan 06"),
+			Assets:       cumulativeAssets,
+			Liabilities: cumulativeLiabilities,
+			NetWorth:    cumulativeAssets - cumulativeLiabilities,
+		})
+	}
+
+	return points, nil
 }
